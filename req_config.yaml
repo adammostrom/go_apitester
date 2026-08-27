@@ -1,0 +1,32 @@
+name: nutrition-basic
+
+method: GET
+path: http://localhost:8080/nutrition
+
+expect:
+  status: 200
+
+body:
+  product_name:
+    values:
+      salmon
+      egg
+      meatballs
+      bread
+
+# LET min, max be fixed
+  amount:
+    random:
+      min: 0
+      max: 200
+
+  unit:
+    values:
+      GRAM
+
+  fields:
+    values:
+      CALORIES
+      FAT
+      SATURATED_FAT
+      TRANS_FAT
