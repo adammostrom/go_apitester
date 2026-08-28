@@ -8,7 +8,7 @@ expect:
 body:
   product_name:
   # Static = each value to be tested
-    static: 
+    #static: 
       values:
         - salmon
         - egg
@@ -23,12 +23,12 @@ body:
 
   unit:
     values:
-      GRAM
+      - GRAM
 
 # List = List of the contents to be sent per request, whole list or sublists per request
   fields:
   # Stochastic = random subsets of the list for each request
-    stochastic: 
+    #stochastic: 
       list:
         - CALORIES
         - FAT

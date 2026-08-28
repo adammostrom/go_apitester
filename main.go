@@ -71,8 +71,14 @@ func main() {
 	config, err := readYamlFile("req_config.yaml")
 	checkError(err, "failed to read yaml file")
 
-	flattened := flattenYamlBody(config.Body)
-	config.Body = flattened
+	var path []string
+
+	flattened, err := flattenYamlBody(config.Body, path)
+	checkError(err, "Failed to parse and flatten yaml body")
+
+	// Here, generate setup for requests, like creating a request for each value in the values if its a "value" operator. Maybe generate a bunch of requests to send, store them in a slice, inform user of amount of requests, and if user wnats to see, prints them before sending them?
+	fmt.Printf("flattened: %v\n", flattened)
+	fmt.Printf("path: %v\n", path)
 
 	fmt.Printf("config.Body: %v\n", flattened)
 
@@ -150,39 +156,80 @@ type Field struct {
 	Values []any
 }
 
-func flattenYamlBody(body map[string]any) map[string]any {
+type RandomOp struct {
+	Operator string
+	Val      any
+}
+
+func flattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 	// While key not equal to values: or random:, store key with value of next key
 
-	result := map[string]any{}
+	var fields []Field
 
-	for k, v := range body {
+	for key, value := range body {
 
-		nested, ok := v.(map[string]any)
+		switch key {
 
-		if !ok {
-			result[k] = v
-			continue
-		}
-
-		if values, ok := nested["values"]; ok {
-			result[k] = values
-			continue
-		}
-
-		if random, ok := nested["random"].(map[string]any); ok {
-			testOption.Random = RandomMinMax{
-				FieldName: k,
-				Min:       random["min"],
-				Max:       random["max"],
+		case "values":
+			// We expect that at "values" to find an array
+			values, ok := value.([]any)
+			if !ok {
+				return nil, fmt.Errorf("values at %v must be an array", path)
 			}
-			fmt.Printf("testCase.Random: %v\n", testOption.Random)
-			continue
+			fields = append(fields, Field{
+				Path:   path,
+				Mode:   "values",
+				Values: values,
+			})
+		case "list":
+			values, ok := value.([]any)
+			if !ok {
+				return nil, fmt.Errorf("List at %v must be an array", path)
+			}
+			fields = append(fields, Field{
+				Path:   path,
+				Mode:   "list",
+				Values: values,
+			})
+		case "random":
+			random, ok := value.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("random at %v must have the structure: random: max:INT min: INT", path)
+			}
+			//TODO: Check for these (that they are filled out)
+			min := random["min"]
+			max := random["max"]
+
+			// TODO: Maybe redesign this, for now this is fine in order to pass ops into Values
+			ops := []any{}
+
+			ops = append(ops,
+				RandomOp{Operator: "max", Val: max},
+				RandomOp{Operator: "min", Val: min},
+			)
+
+			fields = append(fields, Field{
+				Path:   path,
+				Mode:   "random",
+				Values: ops,
+			})
+
+			// Not an operator, hence another level in the yaml
+		default:
+			nested, ok := value.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("expected object at %v", append(path, key))
+			}
+
+			nestedFields, err := flattenYamlBody(nested, append(path, key))
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, nestedFields...)
 		}
-
-		result[k] = flattenYamlBody(nested)
 	}
-	return result
 
+	return fields, nil
 }
 
 func checkError(err error, msg string) {
