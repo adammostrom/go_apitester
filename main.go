@@ -22,19 +22,39 @@ type YamlConfig struct {
 	Body map[string]any `yaml:"body"`
 }
 
+// Hardcoded test cases in the yaml file (can add more later)
+type TestOption struct {
+	Random RandomMinMax
+}
+
 type TestCase struct {
-	Name   string
-	Method string
-	Path   string
-	Body   []byte
-	Expect Expectation
+	Options TestOption
+	Config  YamlConfig
+}
+
+type RandomMinMax struct {
+	FieldName string
+	Max       any
+	Min       any
 }
 
 type Expectation struct {
 	StatusCode int
 }
 
-const TEST_URL = "http://localhost:8080/"
+type Mode string
+
+// Add more eventually
+const (
+	ModeValues     Mode = "values"
+	ModeList       Mode = "list"
+	ModeRandom     Mode = "random"
+	ModeStochastic Mode = "stochastic"
+	ModeStatic     Mode = "static"
+)
+
+// Global for now
+var testOption TestOption
 
 func main() {
 
@@ -50,6 +70,19 @@ func main() {
 
 	config, err := readYamlFile("req_config.yaml")
 	checkError(err, "failed to read yaml file")
+
+	flattened := flattenYamlBody(config.Body)
+	config.Body = flattened
+
+	fmt.Printf("config.Body: %v\n", flattened)
+
+	generateRequest(config, testOption)
+}
+
+func generateRequest(config YamlConfig, options TestOption) {
+
+	// For now, add the amount here, but make this into a function that randomizes, and then break it out so that it generates different ones each request
+	config.Body[options.Random.FieldName] = options.Random.Max
 
 	jsonBody, err := json.Marshal(config.Body)
 	checkError(err, "could not marshal body to JSON\n")
@@ -86,21 +119,6 @@ func main() {
 
 	fmt.Println("Status:", resp.Status)
 	fmt.Println("Body:", string(body))
-}
-
-func sendRequest(w http.ResponseWriter, r *http.Request, yaml YamlConfig) {
-
-	// TODO: Create Response Model and make sure that the Expect is equals that of the request
-	// var resp models.IssueResponse
-
-	// TODO: Parse the yaml.body and turn it into json (I guess)
-	//req, err := http.NewRequest(http.MethodPost, yaml.Path, bytes.NewBuffer(yaml.Body))
-
-	// TODO: CHeck method, if POST, ELSE IF GET etc
-	//resp, err := http.Post(yaml.Path, "application/json", yaml.Body)
-
-	/* 	w.WriteHeader(http.StatusOK)
-	   	json.NewEncoder(w).Encode(resp) */
 
 }
 
@@ -117,6 +135,54 @@ func readYamlFile(path string) (YamlConfig, error) {
 	}
 
 	return config, nil
+}
+
+/*
+
+map[amount:map[random:map[max:200 min:0]] fields:map[values:CALORIES FAT SATURATED_FAT TRANS_FAT] product_name:map[values:salmon egg meatballs bread] unit:map[values:GRAM]]
+
+
+*/
+
+type Field struct {
+	Path   []string
+	Mode   string
+	Values []any
+}
+
+func flattenYamlBody(body map[string]any) map[string]any {
+	// While key not equal to values: or random:, store key with value of next key
+
+	result := map[string]any{}
+
+	for k, v := range body {
+
+		nested, ok := v.(map[string]any)
+
+		if !ok {
+			result[k] = v
+			continue
+		}
+
+		if values, ok := nested["values"]; ok {
+			result[k] = values
+			continue
+		}
+
+		if random, ok := nested["random"].(map[string]any); ok {
+			testOption.Random = RandomMinMax{
+				FieldName: k,
+				Min:       random["min"],
+				Max:       random["max"],
+			}
+			fmt.Printf("testCase.Random: %v\n", testOption.Random)
+			continue
+		}
+
+		result[k] = flattenYamlBody(nested)
+	}
+	return result
+
 }
 
 func checkError(err error, msg string) {

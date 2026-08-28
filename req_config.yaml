@@ -1,18 +1,19 @@
 name: nutrition-basic
-
-method: GET
+method: POST
 path: http://localhost:8080/nutrition
-
 expect:
   status: 200
 
+# Values = One request per value
 body:
   product_name:
-    values:
-      salmon
-      egg
-      meatballs
-      bread
+  # Static = each value to be tested
+    static: 
+      values:
+        - salmon
+        - egg
+        - meatballs
+        - bread
 
 # LET min, max be fixed
   amount:
@@ -24,9 +25,12 @@ body:
     values:
       GRAM
 
+# List = List of the contents to be sent per request, whole list or sublists per request
   fields:
-    values:
-      CALORIES
-      FAT
-      SATURATED_FAT
-      TRANS_FAT
+  # Stochastic = random subsets of the list for each request
+    stochastic: 
+      list:
+        - CALORIES
+        - FAT
+        - SATURATED_FAT
+        - TRANS_FAT
