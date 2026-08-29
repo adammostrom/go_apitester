@@ -85,6 +85,79 @@ func main() {
 	generateRequest(config, testOption)
 }
 
+type Request struct {
+	Name   string
+	Path   string
+	Method string
+	Expect Expectation
+	Body   []byte
+}
+
+func generateRequestHandler(config YamlConfig, bodyFields []Field) {
+
+	// Take the url, method and body, and send it to generate request.
+	// Derive here what should be in the body, which operator etc.
+
+	// If Mode == values, then create one request per value of list, so json becomes "path:value"
+	// We have to build requests basically
+
+	requests := []Request{}
+
+	if bodyFields == nil {
+		fmt.Println("Empty fields list, unable to generate any requests.")
+		return
+	}
+
+	for _, field := range bodyFields {
+
+		switch field.Mode {
+
+		case string(ModeValues):
+			// Make a new request and store in the list of requests
+			generateValueBodies(bodyFields, requests)
+
+		case string(ModeRandom):
+			// Generate a request for a subset of randomized numbers within the range
+
+		case string(ModeList):
+			// For each request, make a subset of the list
+
+		}
+
+	}
+}
+
+func cloneMap(src map[string]any) map[string]any {
+
+	dst := make(map[string]any)
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+// Take all Value operators in the fields, and make a cartesian product of them
+func generateValueBodies(fields []Field, requests []Request) map[string]any {
+
+	// Initially : [{}]
+	body := []map[string]any{
+		{},
+	}
+
+	values := map[string]any{}
+
+	for _, field := range fields {
+
+		if field.Mode == string(ModeValues) {
+			for i := 0; i < len(field.Path)-1; i++ {
+				values[field.Path[i]] = field.Path[i+1]
+			}
+		}
+
+	}
+}
+
+// Generate request should only need the body and the method.
 func generateRequest(config YamlConfig, options TestOption) {
 
 	// For now, add the amount here, but make this into a function that randomizes, and then break it out so that it generates different ones each request

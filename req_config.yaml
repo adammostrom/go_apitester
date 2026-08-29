@@ -26,11 +26,12 @@ body:
       - GRAM
 
 # List = List of the contents to be sent per request, whole list or sublists per request
-  fields:
-  # Stochastic = random subsets of the list for each request
-    #stochastic: 
-      list:
-        - CALORIES
-        - FAT
-        - SATURATED_FAT
-        - TRANS_FAT
+  nutrition_fields:
+    fields:
+    # Stochastic = random subsets of the list for each request
+      #stochastic: 
+        list:
+          - CALORIES
+          - FAT
+          - SATURATED_FAT
+          - TRANS_FAT
