@@ -24,6 +24,7 @@ body:
   unit:
     values:
       - GRAM
+      - CUPS
 
 # List = List of the contents to be sent per request, whole list or sublists per request
   nutrition_fields:
@@ -35,3 +36,5 @@ body:
           - FAT
           - SATURATED_FAT
           - TRANS_FAT
+          - SUGARS
+          - CARBOHYDRATES

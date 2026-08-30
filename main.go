@@ -6,67 +6,18 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"main/models"
+	"main/parser"
 	"net/http"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-type YamlConfig struct {
-	Name   string `yaml:"name"`
-	Method string `yaml:"method"`
-	Path   string `yaml:"path"`
-	Expect struct {
-		Expect int `yaml:"status"`
-	} `yaml:"expect"`
-	Body map[string]any `yaml:"body"`
-}
-
-// Hardcoded test cases in the yaml file (can add more later)
-type TestOption struct {
-	Random RandomMinMax
-}
-
-type TestCase struct {
-	Options TestOption
-	Config  YamlConfig
-}
-
-type RandomMinMax struct {
-	FieldName string
-	Max       any
-	Min       any
-}
-
-type Expectation struct {
-	StatusCode int
-}
-
-type Mode string
-
-// Add more eventually
-const (
-	ModeValues     Mode = "values"
-	ModeList       Mode = "list"
-	ModeRandom     Mode = "random"
-	ModeStochastic Mode = "stochastic"
-	ModeStatic     Mode = "static"
-)
-
 // Global for now
-var testOption TestOption
+var testOption models.TestOption
 
 func main() {
-
-	/*     body := []byte{
-	       "product_name": "Salmon",
-	       "amount": 200,
-	       "unit": "GRAM",
-	       "fields": ["CALORIES", "FAT", "SATURATED_FAT", "TRANS_FAT", "CHOLESTEROL", "CARBOHYDRATES", "SUGARS",
-	       ,"ADDED_SUGARS", "SUCROSE", "GLUCOSE", "FRUCTOSE", "LACTOSE", "STARCH", "FIBER", "PROTEINS", "SALT"
-	       ,"ADDED_SALT","SODIUM", "VITAMIN_C", "VITAMIN_B1","VITAMIN_B2","VITAMIN_PP","VITAMIN_B6","VITAMIN_B9"
-	       ,"VITAMIN_B12", "POTASSIUM", "CALCIUM", "IRON", "MAGNESIUM", "ZINC"]
-	   } */
 
 	config, err := readYamlFile("req_config.yaml")
 	checkError(err, "failed to read yaml file")
@@ -76,24 +27,17 @@ func main() {
 	flattened, err := flattenYamlBody(config.Body, path)
 	checkError(err, "Failed to parse and flatten yaml body")
 
+	requests := generateRequestHandler(config, flattened)
+	for _, req := range requests {
+		fmt.Printf("req: %v\n", req)
+	}
+
 	// Here, generate setup for requests, like creating a request for each value in the values if its a "value" operator. Maybe generate a bunch of requests to send, store them in a slice, inform user of amount of requests, and if user wnats to see, prints them before sending them?
-	fmt.Printf("flattened: %v\n", flattened)
-	fmt.Printf("path: %v\n", path)
 
-	fmt.Printf("config.Body: %v\n", flattened)
-
-	generateRequest(config, testOption)
+	//generateRequest(config, testOption)
 }
 
-type Request struct {
-	Name   string
-	Path   string
-	Method string
-	Expect Expectation
-	Body   []byte
-}
-
-func generateRequestHandler(config YamlConfig, bodyFields []Field) {
+func generateRequestHandler(config models.YamlConfig, bodyFields []models.Field) []map[string]any {
 
 	// Take the url, method and body, and send it to generate request.
 	// Derive here what should be in the body, which operator etc.
@@ -101,64 +45,74 @@ func generateRequestHandler(config YamlConfig, bodyFields []Field) {
 	// If Mode == values, then create one request per value of list, so json becomes "path:value"
 	// We have to build requests basically
 
-	requests := []Request{}
+	cartesianValues := parser.GenerateValueBodies(bodyFields)
 
 	if bodyFields == nil {
 		fmt.Println("Empty fields list, unable to generate any requests.")
-		return
+		return nil
 	}
 
 	for _, field := range bodyFields {
 
 		switch field.Mode {
 
-		case string(ModeValues):
+		case string(models.ModeValues):
 			// Make a new request and store in the list of requests
-			generateValueBodies(bodyFields, requests)
-
-		case string(ModeRandom):
+			//generateValueBodies(bodyFields)
+			continue
+		case string(models.ModeRandom):
 			// Generate a request for a subset of randomized numbers within the range
 
-		case string(ModeList):
+			// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
+
+			randoms, err := parser.GenerateRandomPoints(field, len(cartesianValues))
+			if err != nil {
+				log.Fatal("Failed to generate Random Numbers from Handler")
+			}
+
+			for i, rand := range randoms {
+				parser.SetPath(field.Path, rand, cartesianValues[i])
+			}
+		case string(models.ModeList):
 			// For each request, make a subset of the list
+			lists, err := parser.GenerateSubLists(field, len(cartesianValues))
+			if err != nil {
+				log.Fatal("Failed to generate lists array from request handler.")
+			}
+			for i, list := range lists {
+				parser.SetPath(field.Path, list, cartesianValues[i])
+			}
 
 		}
 
 	}
+	return cartesianValues
 }
 
-func cloneMap(src map[string]any) map[string]any {
-
-	dst := make(map[string]any)
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
+type TaggedValue struct {
+	Value map[string]any
+	Tag   int
 }
 
-// Take all Value operators in the fields, and make a cartesian product of them
-func generateValueBodies(fields []Field, requests []Request) map[string]any {
+func makeCartesianProduct(items []TaggedValue) [][]map[string]any {
 
-	// Initially : [{}]
-	body := []map[string]any{
-		{},
-	}
+	product := [][]map[string]any{}
 
-	values := map[string]any{}
-
-	for _, field := range fields {
-
-		if field.Mode == string(ModeValues) {
-			for i := 0; i < len(field.Path)-1; i++ {
-				values[field.Path[i]] = field.Path[i+1]
+	for i := 0; i < len(items); i++ {
+		for j := i; j < len(items); j++ {
+			current := []map[string]any{}
+			// If they have different tags
+			if items[i].Tag != items[j].Tag {
+				current = append(current, items[i].Value, items[j].Value)
+				product = append(product, current)
 			}
 		}
-
 	}
+	return product
 }
 
 // Generate request should only need the body and the method.
-func generateRequest(config YamlConfig, options TestOption) {
+func generateRequest(config models.YamlConfig, options models.TestOption) {
 
 	// For now, add the amount here, but make this into a function that randomizes, and then break it out so that it generates different ones each request
 	config.Body[options.Random.FieldName] = options.Random.Max
@@ -201,43 +155,29 @@ func generateRequest(config YamlConfig, options TestOption) {
 
 }
 
-func readYamlFile(path string) (YamlConfig, error) {
+func readYamlFile(path string) (models.YamlConfig, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		return YamlConfig{}, fmt.Errorf("failed to read %s: %w", path, err)
+		return models.YamlConfig{}, fmt.Errorf("failed to read %s: %w", path, err)
 	}
 
-	var config YamlConfig
+	var config models.YamlConfig
 
 	if err := yaml.Unmarshal(contents, &config); err != nil {
-		return YamlConfig{}, fmt.Errorf("failed to parse YAML: %w", err)
+		return models.YamlConfig{}, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
 	return config, nil
 }
 
 /*
-
 map[amount:map[random:map[max:200 min:0]] fields:map[values:CALORIES FAT SATURATED_FAT TRANS_FAT] product_name:map[values:salmon egg meatballs bread] unit:map[values:GRAM]]
-
-
 */
 
-type Field struct {
-	Path   []string
-	Mode   string
-	Values []any
-}
-
-type RandomOp struct {
-	Operator string
-	Val      any
-}
-
-func flattenYamlBody(body map[string]any, path []string) ([]Field, error) {
+func flattenYamlBody(body map[string]any, path []string) ([]models.Field, error) {
 	// While key not equal to values: or random:, store key with value of next key
 
-	var fields []Field
+	var fields []models.Field
 
 	for key, value := range body {
 
@@ -249,7 +189,7 @@ func flattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 			if !ok {
 				return nil, fmt.Errorf("values at %v must be an array", path)
 			}
-			fields = append(fields, Field{
+			fields = append(fields, models.Field{
 				Path:   path,
 				Mode:   "values",
 				Values: values,
@@ -259,7 +199,7 @@ func flattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 			if !ok {
 				return nil, fmt.Errorf("List at %v must be an array", path)
 			}
-			fields = append(fields, Field{
+			fields = append(fields, models.Field{
 				Path:   path,
 				Mode:   "list",
 				Values: values,
@@ -273,15 +213,29 @@ func flattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 			min := random["min"]
 			max := random["max"]
 
+			min_float, err := toFloat64(min)
+			if err != nil {
+				return nil, err
+			}
+			max_float, err := toFloat64(max)
+			if err != nil {
+				return nil, err
+			}
+			//min_float, minOk := min.(float64)
+			//max_float, maxOk := max.(float64)
+			/* if !minOk || maxOk {
+				return nil, fmt.Errorf("Random values provided at %v failed to be read as integers: min: %d, max: %d\n", key, min_float, max_float)
+			} */
+
 			// TODO: Maybe redesign this, for now this is fine in order to pass ops into Values
 			ops := []any{}
 
 			ops = append(ops,
-				RandomOp{Operator: "max", Val: max},
-				RandomOp{Operator: "min", Val: min},
+				parser.RandomOp{Operator: parser.MAX_OP, Val: max_float},
+				parser.RandomOp{Operator: parser.MIN_OP, Val: min_float},
 			)
 
-			fields = append(fields, Field{
+			fields = append(fields, models.Field{
 				Path:   path,
 				Mode:   "random",
 				Values: ops,
@@ -303,6 +257,21 @@ func flattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 	}
 
 	return fields, nil
+}
+
+func toFloat64(value any) (float64, error) {
+	switch v := value.(type) {
+	case int:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case uint64:
+		return float64(v), nil
+	case float64:
+		return v, nil
+	default:
+		return 0, fmt.Errorf("expected number, got %T", value)
+	}
 }
 
 func checkError(err error, msg string) {
