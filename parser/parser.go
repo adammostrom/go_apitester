@@ -113,7 +113,12 @@ func GenerateRandomPoints(randomField models.Field, multiplier int) ([]float64, 
 		}
 	}
 
-	for i := 0; i < multiplier; i++ {
+	// TODO: Should always include the min and max, for edge case testing
+	points = append(points, min)
+	points = append(points, max)
+
+	for i := 0; i < multiplier-2; i++ {
+
 		random := randomFloat(min, max)
 
 		if !Contains_float(points, random) {

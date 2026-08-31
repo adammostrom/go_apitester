@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	csvwriter "main/csv_writer"
 	"main/models"
 	"main/parser"
 	"main/utils"
 	"net/http"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -21,11 +23,11 @@ func main() {
 	utils.CheckError(err, "failed to read yaml file")
 
 	// Before anything, send a request to the target api and check that its alive.
-	alive, err := checkAlive(config.Path)
-	if err != nil || !alive {
-		log.Fatal(err)
-		return
-	}
+	/* 	alive, err := checkAlive(config.Path)
+	   	if err != nil || !alive {
+	   		log.Fatal(err)
+	   		return
+	   	} */
 
 	flattenedBody, err := flattenYamlBody(config.Body, []string{})
 	utils.CheckError(err, "Failed to parse and flatten yaml body")
@@ -34,7 +36,6 @@ func main() {
 	for _, req := range requests {
 		fmt.Printf("req: %v\n", req)
 	}
-
 	// Here, generate setup for requests, like creating a request for each value in the values if its a "value" operator. Maybe generate a bunch of requests to send, store them in a slice, inform user of amount of requests, and if user wnats to see, prints them before sending them?
 
 	generateRequest(config, requests)
@@ -113,47 +114,51 @@ func generateRequestHandler(bodyFields []models.Field) []map[string]any {
 // Generate request should only need the body and the method.
 func generateRequest(config models.YamlConfig, requests []map[string]any) {
 
-	prepared_requests := [][]byte{}
+	responses := []models.Response{}
 
+	//prepared_requests := [][]byte{}
 	for _, request := range requests {
 		jsonBody, err := json.Marshal(request)
-		utils.CheckError(err, "could not marshal body to JSON\n")
-		prepared_requests = append(prepared_requests, jsonBody)
-	}
+		utils.CheckError(err, "could not marshal body to JSON")
 
-	for _, jsonBody := range prepared_requests {
-		bodyReader := bytes.NewReader(jsonBody)
-		req, err := http.NewRequest(config.Method, config.Path, bodyReader)
+		fmt.Println("Request:", string(jsonBody))
 
+		req, err := http.NewRequest(
+			config.Method,
+			config.Path,
+			bytes.NewReader(jsonBody),
+		)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		req.Header.Set("Content-Type", "application/json")
-		req_data, err := io.ReadAll(req.Body)
 
+		// Measure time for a request --> response
+
+		start := time.Now()
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Request: ", string(req_data))
-
-		client := &http.Client{}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer resp.Body.Close()
+		duration := time.Since(start)
 
 		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Println("Status:", resp.Status)
-		fmt.Println("Body:", string(body))
-
+		responses = append(responses, models.Response{Body: string(body), Resp: resp, Time: time.Duration(duration.Milliseconds())})
 	}
+	parseResponse(responses, config)
 
+}
+
+func parseResponse(responses []models.Response, config models.YamlConfig) {
+
+	csvwriter.WriteToCsv(config, responses)
 }
 
 func readYamlFile(path string) (models.YamlConfig, error) {

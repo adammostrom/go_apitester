@@ -1,6 +1,6 @@
 name: nutrition-basic
 method: POST
-path: http://localhost:8080/nutrition
+path: http://localhost:8080/nutrition 
 expect:
   status: 200
 
@@ -14,21 +14,21 @@ body:
         - egg
         - meatballs
         - bread
+        - 92
 
 # LET min, max be fixed
   amount:
     random:
-      min: 0
+      min: 1
       max: 200
 
   unit:
     values:
+      - GRAM 
       - GRAM
-      - CUPS
 
 # List = List of the contents to be sent per request, whole list or sublists per request
-  nutrition_fields:
-    fields:
+  fields:
     # Stochastic = random subsets of the list for each request
       #stochastic: 
         list:
@@ -36,5 +36,3 @@ body:
           - FAT
           - SATURATED_FAT
           - TRANS_FAT
-          - SUGARS
-          - CARBOHYDRATES

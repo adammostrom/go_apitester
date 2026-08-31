@@ -1,5 +1,10 @@
 package models
 
+import (
+	"net/http"
+	"time"
+)
+
 type Request struct {
 	Name   string
 	Path   string
@@ -43,4 +48,10 @@ type Field struct {
 	Path   []string
 	Mode   string
 	Values []any
+}
+
+type Response struct {
+	Body string
+	Resp *http.Response
+	Time time.Duration
 }

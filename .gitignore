@@ -1,5 +1,5 @@
-.issuetracker*
 docs/
-issuetracker
 example.txt
 test.yaml
+issuetracker
+*.csv
