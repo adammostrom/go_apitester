@@ -45,7 +45,9 @@ func generateRequestHandler(config models.YamlConfig, bodyFields []models.Field)
 	// If Mode == values, then create one request per value of list, so json becomes "path:value"
 	// We have to build requests basically
 
-	cartesianValues := parser.GenerateValueBodies(bodyFields)
+	prepared_requests := parser.GenerateValueBodies(bodyFields)
+
+	amount_requests := len(prepared_requests)
 
 	if bodyFields == nil {
 		fmt.Println("Empty fields list, unable to generate any requests.")
@@ -65,50 +67,28 @@ func generateRequestHandler(config models.YamlConfig, bodyFields []models.Field)
 
 			// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
 
-			randoms, err := parser.GenerateRandomPoints(field, len(cartesianValues))
+			randoms, err := parser.GenerateRandomPoints(field, amount_requests)
 			if err != nil {
 				log.Fatal("Failed to generate Random Numbers from Handler")
 			}
 
 			for i, rand := range randoms {
-				parser.SetPath(field.Path, rand, cartesianValues[i])
+				parser.SetPath(field.Path, rand, prepared_requests[i])
 			}
 		case string(models.ModeList):
 			// For each request, make a subset of the list
-			lists, err := parser.GenerateSubLists(field, len(cartesianValues))
+			lists, err := parser.GenerateSubLists(field, amount_requests)
 			if err != nil {
 				log.Fatal("Failed to generate lists array from request handler.")
 			}
 			for i, list := range lists {
-				parser.SetPath(field.Path, list, cartesianValues[i])
+				parser.SetPath(field.Path, list, prepared_requests[i])
 			}
 
 		}
 
 	}
-	return cartesianValues
-}
-
-type TaggedValue struct {
-	Value map[string]any
-	Tag   int
-}
-
-func makeCartesianProduct(items []TaggedValue) [][]map[string]any {
-
-	product := [][]map[string]any{}
-
-	for i := 0; i < len(items); i++ {
-		for j := i; j < len(items); j++ {
-			current := []map[string]any{}
-			// If they have different tags
-			if items[i].Tag != items[j].Tag {
-				current = append(current, items[i].Value, items[j].Value)
-				product = append(product, current)
-			}
-		}
-	}
-	return product
+	return prepared_requests
 }
 
 // Generate request should only need the body and the method.
