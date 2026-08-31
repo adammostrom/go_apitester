@@ -8,49 +8,68 @@ import (
 	"log"
 	"main/models"
 	"main/parser"
+	"main/utils"
 	"net/http"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Global for now
-var testOption models.TestOption
-
 func main() {
 
 	config, err := readYamlFile("req_config.yaml")
-	checkError(err, "failed to read yaml file")
+	utils.CheckError(err, "failed to read yaml file")
 
-	var path []string
+	// Before anything, send a request to the target api and check that its alive.
+	alive, err := checkAlive(config.Path)
+	if err != nil || !alive {
+		log.Fatal(err)
+		return
+	}
 
-	flattened, err := flattenYamlBody(config.Body, path)
-	checkError(err, "Failed to parse and flatten yaml body")
+	flattenedBody, err := flattenYamlBody(config.Body, []string{})
+	utils.CheckError(err, "Failed to parse and flatten yaml body")
 
-	requests := generateRequestHandler(config, flattened)
+	requests := generateRequestHandler(flattenedBody)
 	for _, req := range requests {
 		fmt.Printf("req: %v\n", req)
 	}
 
 	// Here, generate setup for requests, like creating a request for each value in the values if its a "value" operator. Maybe generate a bunch of requests to send, store them in a slice, inform user of amount of requests, and if user wnats to see, prints them before sending them?
 
-	//generateRequest(config, testOption)
+	generateRequest(config, requests)
 }
 
-func generateRequestHandler(config models.YamlConfig, bodyFields []models.Field) []map[string]any {
+// Send a GET request to url endpoint and expect a status code 200 back.
+func checkAlive(url string) (bool, error) {
 
-	// Take the url, method and body, and send it to generate request.
-	// Derive here what should be in the body, which operator etc.
+	client := &http.Client{}
 
-	// If Mode == values, then create one request per value of list, so json becomes "path:value"
-	// We have to build requests basically
+	req, err := http.NewRequest("GET", url, nil)
+	//req.Header.Add("If-None-Match", `W/"wyzzy"`)
+	resp, err := client.Do(req)
 
-	cartesianValues := parser.GenerateValueBodies(bodyFields)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 {
+		return true, nil
+	}
+	return false, fmt.Errorf("Server not alive at url: %s\nStatus code: %d", url, resp.StatusCode)
+
+}
+
+// Generate the request bodies from flattened/parsed yaml bodies.
+func generateRequestHandler(bodyFields []models.Field) []map[string]any {
 
 	if bodyFields == nil {
 		fmt.Println("Empty fields list, unable to generate any requests.")
 		return nil
 	}
+
+	cartesianValues := parser.GenerateValueBodies(bodyFields)
 
 	for _, field := range bodyFields {
 
@@ -89,69 +108,49 @@ func generateRequestHandler(config models.YamlConfig, bodyFields []models.Field)
 	return cartesianValues
 }
 
-type TaggedValue struct {
-	Value map[string]any
-	Tag   int
-}
-
-func makeCartesianProduct(items []TaggedValue) [][]map[string]any {
-
-	product := [][]map[string]any{}
-
-	for i := 0; i < len(items); i++ {
-		for j := i; j < len(items); j++ {
-			current := []map[string]any{}
-			// If they have different tags
-			if items[i].Tag != items[j].Tag {
-				current = append(current, items[i].Value, items[j].Value)
-				product = append(product, current)
-			}
-		}
-	}
-	return product
-}
-
 // Generate request should only need the body and the method.
-func generateRequest(config models.YamlConfig, options models.TestOption) {
+func generateRequest(config models.YamlConfig, requests []map[string]any) {
 
-	// For now, add the amount here, but make this into a function that randomizes, and then break it out so that it generates different ones each request
-	config.Body[options.Random.FieldName] = options.Random.Max
+	prepared_requests := [][]byte{}
 
-	jsonBody, err := json.Marshal(config.Body)
-	checkError(err, "could not marshal body to JSON\n")
-
-	bodyReader := bytes.NewReader(jsonBody)
-
-	req, err := http.NewRequest(config.Method, config.Path, bodyReader)
-
-	if err != nil {
-		log.Fatal(err)
+	for _, request := range requests {
+		jsonBody, err := json.Marshal(request)
+		utils.CheckError(err, "could not marshal body to JSON\n")
+		prepared_requests = append(prepared_requests, jsonBody)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	for _, jsonBody := range prepared_requests {
+		bodyReader := bytes.NewReader(jsonBody)
+		req, err := http.NewRequest(config.Method, config.Path, bodyReader)
 
-	req_data, err := io.ReadAll(req.Body)
-	if err != nil {
-		log.Fatal(err)
+		if err != nil {
+			log.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req_data, err := io.ReadAll(req.Body)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Request: ", string(req_data))
+
+		client := &http.Client{}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println("Status:", resp.Status)
+		fmt.Println("Body:", string(body))
+
 	}
-	fmt.Println("Request: ", string(req_data))
-
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Status:", resp.Status)
-	fmt.Println("Body:", string(body))
 
 }
 
@@ -271,12 +270,5 @@ func toFloat64(value any) (float64, error) {
 		return v, nil
 	default:
 		return 0, fmt.Errorf("expected number, got %T", value)
-	}
-}
-
-func checkError(err error, msg string) {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s - %v \n", msg, err)
-		os.Exit(1)
 	}
 }

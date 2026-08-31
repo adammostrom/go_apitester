@@ -18,16 +18,6 @@ type YamlConfig struct {
 	Body map[string]any `yaml:"body"`
 }
 
-// Hardcoded test cases in the yaml file (can add more later)
-type TestOption struct {
-	Random RandomMinMax
-}
-
-type TestCase struct {
-	Options TestOption
-	Config  YamlConfig
-}
-
 type RandomMinMax struct {
 	FieldName string
 	Max       any
