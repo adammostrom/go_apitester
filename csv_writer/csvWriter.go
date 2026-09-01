@@ -6,21 +6,23 @@ import (
 	"main/models"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
 const OUTPUT_PATH = "/data"
 
-func getTimeStamp() string {
-	currentTime := time.Now()
-	return currentTime.Format("2006-01-02_15-04-05")
-}
+/*
+TODO : Make the user also able to input their own file and/or filename to be printed at
+apitest run tests.yaml --verbose
+apitest run tests.yaml --parallel 4
+apitest run tests.yaml --output results.csv
+
+*/
 
 // Alternative for now, bundle params into struct or send whole config
-func createCSV(testName string) (*os.File, *csv.Writer, error) {
+func createCSV(outputFileName string) (*os.File, *csv.Writer, error) {
 	file, err := os.Create(
-		cleanString(testName) + getTimeStamp() + ".csv",
+		outputFileName + ".csv",
 	)
 	if err != nil {
 		return nil, nil, err
@@ -50,9 +52,9 @@ func createCSV(testName string) (*os.File, *csv.Writer, error) {
 	return file, writer, nil
 }
 
-func WriteToCsv(config models.YamlConfig, responses []models.Response) {
+func WriteToCsv(config models.YamlConfig, responses []models.Response, fileName string) {
 
-	file, writer, err := createCSV(config.Name)
+	file, writer, err := createCSV(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,8 +88,4 @@ func WriteToCsv(config models.YamlConfig, responses []models.Response) {
 	if err := writer.Error(); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func cleanString(input string) string {
-	return strings.ToLower(strings.ReplaceAll(input, " ", "_"))
 }

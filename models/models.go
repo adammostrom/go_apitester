@@ -56,3 +56,10 @@ type Response struct {
 	Time   time.Duration
 	Result string
 }
+
+type RunConfig struct {
+	Repeat   int
+	Verbose  bool
+	Output   string
+	Requests int
+}
