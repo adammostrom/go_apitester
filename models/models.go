@@ -51,7 +51,8 @@ type Field struct {
 }
 
 type Response struct {
-	Body string
-	Resp *http.Response
-	Time time.Duration
+	Body   string
+	Resp   *http.Response
+	Time   time.Duration
+	Result string
 }

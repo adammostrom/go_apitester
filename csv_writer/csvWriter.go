@@ -62,18 +62,12 @@ func WriteToCsv(config models.YamlConfig, responses []models.Response) {
 
 	for _, response := range responses {
 
-		result := "FAILED"
-
-		if config.Expect.Expect == response.Resp.StatusCode {
-			result = "PASS"
-		}
-
 		records := []string{
 			config.Name,
 			time.Now().Format(time.RFC3339),
 			config.Method,
 			response.Resp.Request.URL.Path,
-			result,
+			response.Result,
 			response.Resp.Status,
 			strconv.Itoa(response.Resp.StatusCode),
 			strconv.Itoa(config.Expect.Expect),

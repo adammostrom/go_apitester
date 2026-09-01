@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	cli "main/cli"
 	csvwriter "main/csv_writer"
 	"main/models"
 	"main/parser"
@@ -18,6 +19,8 @@ import (
 )
 
 func main() {
+
+	cli.Execute()
 
 	config, err := readYamlFile("req_config.yaml")
 	utils.CheckError(err, "failed to read yaml file")
@@ -72,6 +75,8 @@ func generateRequestHandler(bodyFields []models.Field) []map[string]any {
 
 	prepared_requests := parser.GenerateValueBodies(bodyFields)
 
+	// TODO: if the prepared_requests (permutated yaml values) are less than amount of requests, copy them randomly to fill out the list of requests. If the permutation is larger than the amount of requests, cut off the list, and save it presentable to the user like "requests NOT sent, to send a fully covered permutation, increase amount of requests to: "
+	// Should be determined by the user input (amount of requests)
 	amount_requests := len(prepared_requests)
 
 	for _, field := range bodyFields {
@@ -79,16 +84,14 @@ func generateRequestHandler(bodyFields []models.Field) []map[string]any {
 		switch field.Mode {
 
 		case string(models.ModeValues):
-			// Make a new request and store in the list of requests
-			//generateValueBodies(bodyFields)
 			continue
-		case string(models.ModeRandom):
-			// Generate a request for a subset of randomized numbers within the range
 
-			// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
+		// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
+		case string(models.ModeRandom):
 
 			randoms, err := parser.GenerateRandomPoints(field, amount_requests)
 			if err != nil {
+				// TODO: Make sure empty (not filled out min, max) returns in this crashing.
 				log.Fatal("Failed to generate Random Numbers from Handler")
 			}
 
@@ -112,6 +115,7 @@ func generateRequestHandler(bodyFields []models.Field) []map[string]any {
 }
 
 // Generate request should only need the body and the method.
+// TODO: Split up and refactor function
 func generateRequest(config models.YamlConfig, requests []map[string]any) {
 
 	responses := []models.Response{}
@@ -149,8 +153,16 @@ func generateRequest(config models.YamlConfig, requests []map[string]any) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		result := "failed"
+		if resStatusCode := config.Expect.Expect; resStatusCode == resp.StatusCode {
+			result = "passed"
+		}
 
-		responses = append(responses, models.Response{Body: string(body), Resp: resp, Time: time.Duration(duration.Milliseconds())})
+		responses = append(responses, models.Response{
+			Body:   string(body),
+			Resp:   resp,
+			Time:   time.Duration(duration.Milliseconds()),
+			Result: result})
 	}
 	parseResponse(responses, config)
 
