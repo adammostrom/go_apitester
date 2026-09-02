@@ -13,12 +13,6 @@ type Request struct {
 	Body   []byte
 }
 
-type RandomMinMax struct {
-	FieldName string
-	Max       any
-	Min       any
-}
-
 type Expectation struct {
 	StatusCode int
 }
@@ -39,4 +33,5 @@ type Response struct {
 	Resp   *http.Response
 	Time   time.Duration
 	Result string
+	Error  error
 }

@@ -1,67 +1,111 @@
 package runner
 
 import (
-	"log"
-	csvwriter "main/csv_writer"
-	"main/printout"
+	"fmt"
+	"main/config"
+	httpClient "main/httpClient"
+	"main/models"
+	"main/parser"
 	"main/reader"
-	"main/requestHandler"
+	reporter "main/reporter"
+	"os"
 	"strings"
-	"time"
 )
 
-type RunConfig struct {
-	Repeat   int
-	Verbose  bool
-	Output   string
-	Requests int
-}
-
-func RunTests(runConfig RunConfig, file string) (string, error) {
+func RunTests(runConfig config.RunConfig, file string) error {
 
 	// Check file actually a yaml file
 	if runConfig.Verbose {
-		printout.Verbose = true
+		reporter.Verbose = true
 	}
 
 	config, err := reader.ReadYamlFile(file)
-	log.Fatal(err)
+	if err != nil {
+		return fmt.Errorf("Failed to read Yaml file: %s. error: %w", file, err)
+	}
 
 	flattenedBody, err := reader.FlattenYamlBody(config.Body, []string{})
-	log.Fatal(err)
+	if err != nil {
+		return fmt.Errorf("Failed to parse yaml body section: %s. error: %w ", config.Body, err)
+	}
 
-	requests := requestHandler.ParseAndGenerateRequests(flattenedBody)
+	requests := parser.ParseAndGenerateRequests(flattenedBody)
 
 	for _, req := range requests {
-		printout.VPrintf("generated requests: %v\n", req)
+		reporter.VPrintf("generated requests: %v\n", req)
 	}
 	// Here, generate setup for requests, like creating a request for each value in the values if its a "value" operator. Maybe generate a bunch of requests to send, store them in a slice, inform user of amount of requests, and if user wnats to see, prints them before sending them?
 
-	responses, err := requestHandler.SendRequests(config, requests)
+	responses, err := sendRequests(config, requests)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	outputFile := determineOutputFile(config.Name, runConfig)
+	if runConfig.Output != "" {
+		reporter.WriteToCsv(config.Name, config.Method, config.Expect.Expect, responses, outputFile)
+		return nil
+	}
 
-	csvwriter.WriteToCsv(config.Name, config.Method, config.Expect.Expect, responses, outputFile)
-	return "success", nil
+	/*
+			testName,
+		time.Now().Format(time.RFC3339),
+		testMethod,
+		response.Resp.Request.URL.Path,
+		response.Result,
+		response.Resp.Status,
+		strconv.Itoa(response.Resp.StatusCode),
+		strconv.Itoa(testExpectedMethod),
+		response.Time.String(),
+		response.Body,
+
+	*/
+
+	reporter.PrintResults(config, responses)
+	return nil
 
 }
 
-func determineOutputFile(testName string, runConfig RunConfig) string {
+func sendRequests(config config.YamlConfig, requests []map[string]any) ([]models.Response, error) {
+
+	responses := []models.Response{}
+
+	//prepared_requests := [][]byte{}
+	for _, request := range requests {
+
+		response, err := httpClient.SendRequest(config.Method, config.Path, request)
+		if err != nil {
+			//fmt.Printf("Request #%d failed -> %v\nwith error: %v", i, request, err)
+
+			responses = append(responses, models.Response{Result: "FAIL", Error: err})
+			continue
+		}
+		if response.Resp.StatusCode == config.Expect.Expect {
+			response.Result = "PASS"
+		} else {
+			response.Result = "FAIL"
+		}
+		responses = append(responses, response)
+	}
+	return responses, nil
+
+}
+
+func determineOutputFile(testName string, runConfig config.RunConfig) string {
 	if runConfig.Output != "" {
 		return runConfig.Output
 	}
 
-	return cleanString(testName) + getTimeStamp() + ".csv"
+	return cleanString(testName) + reporter.GetTimeStamp() + ".csv"
 }
 
 func cleanString(input string) string {
 	return strings.ToLower(strings.ReplaceAll(input, " ", "_"))
 }
 
-func getTimeStamp() string {
-	currentTime := time.Now()
-	return currentTime.Format("2006-01-02_15-04-05")
+func checkError(err error, msg string) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s - %v \n", msg, err)
+		os.Exit(1)
+	}
 }

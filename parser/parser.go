@@ -2,12 +2,13 @@ package parser
 
 import (
 	"fmt"
+	"log"
 	"main/models"
 	"math/rand/v2"
 )
 
 // Takes a slice of paths, and appends them into a recursive map
-func SetPath(path []string, val any, target map[string]any) {
+func setPath(path []string, val any, target map[string]any) {
 
 	body := target
 
@@ -31,6 +32,55 @@ type Field struct {
 	Path   []string
 	Mode   string
 	Values []any
+}
+
+// Generate the request bodies from flattened/parsed yaml bodies.
+func ParseAndGenerateRequests(bodyFields []Field) []map[string]any {
+
+	if bodyFields == nil {
+		fmt.Println("Empty fields list, unable to generate any requests.")
+		return nil
+	}
+
+	prepared_requests := GenerateValueBodies(bodyFields)
+
+	// TODO: if the prepared_requests (permutated yaml values) are less than amount of requests, copy them randomly to fill out the list of requests. If the permutation is larger than the amount of requests, cut off the list, and save it presentable to the user like "requests NOT sent, to send a fully covered permutation, increase amount of requests to: "
+	// Should be determined by the user input (amount of requests)
+	amount_requests := len(prepared_requests)
+
+	for _, field := range bodyFields {
+
+		switch field.Mode {
+
+		case string(models.ModeValues):
+			continue
+
+		// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
+		case string(models.ModeRandom):
+
+			randoms, err := GenerateRandomPoints(field, amount_requests)
+			if err != nil {
+				// TODO: Make sure empty (not filled out min, max) returns in this crashing.
+				log.Fatal("Failed to generate Random Numbers from Handler")
+			}
+
+			for i, rand := range randoms {
+				setPath(field.Path, rand, prepared_requests[i])
+			}
+		case string(models.ModeList):
+			// For each request, make a subset of the list
+			lists, err := GenerateSubLists(field, amount_requests)
+			if err != nil {
+				log.Fatal("Failed to generate lists array from request handler.")
+			}
+			for i, list := range lists {
+				setPath(field.Path, list, prepared_requests[i])
+			}
+
+		}
+
+	}
+	return prepared_requests
 }
 
 // Take all Value operators in the fields, and make a cartesian product of them
@@ -59,7 +109,7 @@ func GenerateValueBodies(fields []Field) []map[string]any {
 
 				newBody := cloneMap(body)
 
-				SetPath(field.Path, value, newBody)
+				setPath(field.Path, value, newBody)
 
 				newBodies = append(newBodies, newBody)
 			}

@@ -2,32 +2,23 @@ package reader
 
 import (
 	"fmt"
+	"main/config"
 	"main/parser"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-type YamlConfig struct {
-	Name   string `yaml:"name"`
-	Method string `yaml:"method"`
-	Path   string `yaml:"path"`
-	Expect struct {
-		Expect int `yaml:"status"`
-	} `yaml:"expect"`
-	Body map[string]any `yaml:"body"`
-}
-
-func ReadYamlFile(path string) (YamlConfig, error) {
+func ReadYamlFile(path string) (config.YamlConfig, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		return YamlConfig{}, fmt.Errorf("failed to read %s: %w", path, err)
+		return config.YamlConfig{}, fmt.Errorf("failed to read %s: %w", path, err)
 	}
 
-	var config YamlConfig
+	var config config.YamlConfig
 
 	if err := yaml.Unmarshal(contents, &config); err != nil {
-		return YamlConfig{}, fmt.Errorf("failed to parse YAML: %w", err)
+		return config, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
 	return config, nil

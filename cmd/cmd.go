@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"main/config"
 	"main/runner"
 	"os"
 
@@ -28,19 +28,16 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file := args[0]
 
-		config := runner.RunConfig{
+		config := config.RunConfig{
 			Repeat:   repeat,
 			Verbose:  verbose,
 			Output:   output,
 			Requests: requests,
 		}
-		results, err := runner.RunTests(config, file)
+		err := runner.RunTests(config, file)
 		if err != nil {
 			return err
 		}
-
-		fmt.Println(results)
-
 		return nil
 	},
 }

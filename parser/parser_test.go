@@ -16,7 +16,7 @@ func TestSetPath(t *testing.T) {
 	}
 	got := map[string]any{}
 
-	SetPath(path, "salmon", got)
+	setPath(path, "salmon", got)
 
 	want := map[string]any{
 		"data": map[string]any{
@@ -39,7 +39,7 @@ func TestSetPath(t *testing.T) {
 
 func TestGenerateValueBodies(t *testing.T) {
 
-	fields := []models.Field{
+	fields := []Field{
 		{
 			Path:   []string{"product_name"},
 			Mode:   string(models.ModeValues),
@@ -94,7 +94,7 @@ func TestGenerateValueBodies(t *testing.T) {
 
 func TestGenerateRandomPoints(t *testing.T) {
 
-	field := models.Field{
+	field := Field{
 		Path: []string{"amount"},
 		Mode: string(models.ModeRandom),
 		Values: []any{

@@ -1,4 +1,4 @@
-package csvwriter
+package reporter
 
 import (
 	"encoding/csv"
