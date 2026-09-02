@@ -9,13 +9,14 @@ import (
 	"main/models"
 	"main/parser"
 	"main/printout"
+	"main/reader"
 	"net/http"
 	"os"
 	"time"
 )
 
 // Generate the request bodies from flattened/parsed yaml bodies.
-func ParseAndGenerateRequests(bodyFields []models.Field) []map[string]any {
+func ParseAndGenerateRequests(bodyFields []parser.Field) []map[string]any {
 
 	if bodyFields == nil {
 		fmt.Println("Empty fields list, unable to generate any requests.")
@@ -65,7 +66,7 @@ func ParseAndGenerateRequests(bodyFields []models.Field) []map[string]any {
 
 // Generate request should only need the body and the method.
 // TODO: Split up and refactor function
-func SendRequests(config models.YamlConfig, requests []map[string]any) ([]models.Response, error) {
+func SendRequests(config reader.YamlConfig, requests []map[string]any) ([]models.Response, error) {
 
 	responses := []models.Response{}
 

@@ -34,22 +34,9 @@ const (
 	ModeStatic     Mode = "static"
 )
 
-type Field struct {
-	Path   []string
-	Mode   string
-	Values []any
-}
-
 type Response struct {
 	Body   string
 	Resp   *http.Response
 	Time   time.Duration
 	Result string
-}
-
-type RunConfig struct {
-	Repeat   int
-	Verbose  bool
-	Output   string
-	Requests int
 }

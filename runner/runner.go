@@ -3,7 +3,6 @@ package runner
 import (
 	"log"
 	csvwriter "main/csv_writer"
-	"main/models"
 	"main/printout"
 	"main/reader"
 	"main/requestHandler"
@@ -11,7 +10,14 @@ import (
 	"time"
 )
 
-func RunTests(runConfig models.RunConfig, file string) (string, error) {
+type RunConfig struct {
+	Repeat   int
+	Verbose  bool
+	Output   string
+	Requests int
+}
+
+func RunTests(runConfig RunConfig, file string) (string, error) {
 
 	// Check file actually a yaml file
 	if runConfig.Verbose {
@@ -36,19 +42,19 @@ func RunTests(runConfig models.RunConfig, file string) (string, error) {
 		log.Fatal(err)
 	}
 
-	outputFile := determineOutputFile(config, runConfig)
+	outputFile := determineOutputFile(config.Name, runConfig)
 
-	csvwriter.WriteToCsv(config, responses, outputFile)
+	csvwriter.WriteToCsv(config.Name, config.Method, config.Expect.Expect, responses, outputFile)
 	return "success", nil
 
 }
 
-func determineOutputFile(config models.YamlConfig, runConfig models.RunConfig) string {
+func determineOutputFile(testName string, runConfig RunConfig) string {
 	if runConfig.Output != "" {
 		return runConfig.Output
 	}
 
-	return cleanString(config.Name) + getTimeStamp() + ".csv"
+	return cleanString(testName) + getTimeStamp() + ".csv"
 }
 
 func cleanString(input string) string {

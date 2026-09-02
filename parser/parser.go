@@ -27,8 +27,14 @@ func SetPath(path []string, val any, target map[string]any) {
 	//return body
 }
 
+type Field struct {
+	Path   []string
+	Mode   string
+	Values []any
+}
+
 // Take all Value operators in the fields, and make a cartesian product of them
-func GenerateValueBodies(fields []models.Field) []map[string]any {
+func GenerateValueBodies(fields []Field) []map[string]any {
 
 	// Initially : [{}]
 	bodies := []map[string]any{
@@ -83,7 +89,7 @@ const (
 )
 
 // TODO: Currently only supporting integers.
-func GenerateRandomPoints(randomField models.Field, multiplier int) ([]float64, error) {
+func GenerateRandomPoints(randomField Field, multiplier int) ([]float64, error) {
 
 	points := []float64{}
 
@@ -131,7 +137,7 @@ func GenerateRandomPoints(randomField models.Field, multiplier int) ([]float64, 
 	return points, nil
 }
 
-func GenerateSubLists(field models.Field, multiplier int) ([][]any, error) {
+func GenerateSubLists(field Field, multiplier int) ([][]any, error) {
 
 	subLists := [][]any{}
 

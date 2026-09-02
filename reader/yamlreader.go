@@ -37,16 +37,10 @@ func ReadYamlFile(path string) (YamlConfig, error) {
 map[amount:map[random:map[max:200 min:0]] fields:map[values:CALORIES FAT SATURATED_FAT TRANS_FAT] product_name:map[values:salmon egg meatballs bread] unit:map[values:GRAM]]
 */
 
-type Field struct {
-	Path   []string
-	Mode   string
-	Values []any
-}
-
-func FlattenYamlBody(body map[string]any, path []string) ([]Field, error) {
+func FlattenYamlBody(body map[string]any, path []string) ([]parser.Field, error) {
 	// While key not equal to values: or random:, store key with value of next key
 
-	var fields []Field
+	var fields []parser.Field
 
 	for key, value := range body {
 
@@ -58,7 +52,7 @@ func FlattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 			if !ok {
 				return nil, fmt.Errorf("values at %v must be an array", path)
 			}
-			fields = append(fields, Field{
+			fields = append(fields, parser.Field{
 				Path:   path,
 				Mode:   "values",
 				Values: values,
@@ -68,7 +62,7 @@ func FlattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 			if !ok {
 				return nil, fmt.Errorf("List at %v must be an array", path)
 			}
-			fields = append(fields, Field{
+			fields = append(fields, parser.Field{
 				Path:   path,
 				Mode:   "list",
 				Values: values,
@@ -104,7 +98,7 @@ func FlattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 				parser.RandomOp{Operator: parser.MIN_OP, Val: min_float},
 			)
 
-			fields = append(fields, Field{
+			fields = append(fields, parser.Field{
 				Path:   path,
 				Mode:   "random",
 				Values: ops,

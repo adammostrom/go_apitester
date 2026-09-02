@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"main/models"
 	"main/runner"
 	"os"
 
@@ -29,7 +28,7 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file := args[0]
 
-		config := models.RunConfig{
+		config := runner.RunConfig{
 			Repeat:   repeat,
 			Verbose:  verbose,
 			Output:   output,

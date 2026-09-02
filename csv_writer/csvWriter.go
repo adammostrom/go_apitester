@@ -52,7 +52,7 @@ func createCSV(outputFileName string) (*os.File, *csv.Writer, error) {
 	return file, writer, nil
 }
 
-func WriteToCsv(config models.YamlConfig, responses []models.Response, fileName string) {
+func WriteToCsv(testName string, testMethod string, testExpectedMethod int, responses []models.Response, fileName string) {
 
 	file, writer, err := createCSV(fileName)
 	if err != nil {
@@ -65,14 +65,14 @@ func WriteToCsv(config models.YamlConfig, responses []models.Response, fileName 
 	for _, response := range responses {
 
 		records := []string{
-			config.Name,
+			testName,
 			time.Now().Format(time.RFC3339),
-			config.Method,
+			testMethod,
 			response.Resp.Request.URL.Path,
 			response.Result,
 			response.Resp.Status,
 			strconv.Itoa(response.Resp.StatusCode),
-			strconv.Itoa(config.Expect.Expect),
+			strconv.Itoa(testExpectedMethod),
 			response.Time.String(),
 			response.Body,
 			//response.Resp.Request.GetBody,
