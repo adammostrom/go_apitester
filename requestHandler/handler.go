@@ -9,8 +9,8 @@ import (
 	"main/models"
 	"main/parser"
 	"main/printout"
-	"main/utils"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -72,7 +72,7 @@ func SendRequests(config models.YamlConfig, requests []map[string]any) ([]models
 	//prepared_requests := [][]byte{}
 	for _, request := range requests {
 		jsonBody, err := json.Marshal(request)
-		utils.CheckError(err, "could not marshal body to JSON")
+		checkError(err, "could not marshal body to JSON")
 
 		req, err := http.NewRequest(
 			config.Method,
@@ -117,4 +117,11 @@ func SendRequests(config models.YamlConfig, requests []map[string]any) ([]models
 	}
 	return responses, nil
 
+}
+
+func checkError(err error, msg string) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s - %v \n", msg, err)
+		os.Exit(1)
+	}
 }

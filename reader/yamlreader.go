@@ -2,24 +2,32 @@ package reader
 
 import (
 	"fmt"
-	"main/models"
 	"main/parser"
-	"main/utils"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-func ReadYamlFile(path string) (models.YamlConfig, error) {
+type YamlConfig struct {
+	Name   string `yaml:"name"`
+	Method string `yaml:"method"`
+	Path   string `yaml:"path"`
+	Expect struct {
+		Expect int `yaml:"status"`
+	} `yaml:"expect"`
+	Body map[string]any `yaml:"body"`
+}
+
+func ReadYamlFile(path string) (YamlConfig, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		return models.YamlConfig{}, fmt.Errorf("failed to read %s: %w", path, err)
+		return YamlConfig{}, fmt.Errorf("failed to read %s: %w", path, err)
 	}
 
-	var config models.YamlConfig
+	var config YamlConfig
 
 	if err := yaml.Unmarshal(contents, &config); err != nil {
-		return models.YamlConfig{}, fmt.Errorf("failed to parse YAML: %w", err)
+		return YamlConfig{}, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
 	return config, nil
@@ -29,10 +37,16 @@ func ReadYamlFile(path string) (models.YamlConfig, error) {
 map[amount:map[random:map[max:200 min:0]] fields:map[values:CALORIES FAT SATURATED_FAT TRANS_FAT] product_name:map[values:salmon egg meatballs bread] unit:map[values:GRAM]]
 */
 
-func FlattenYamlBody(body map[string]any, path []string) ([]models.Field, error) {
+type Field struct {
+	Path   []string
+	Mode   string
+	Values []any
+}
+
+func FlattenYamlBody(body map[string]any, path []string) ([]Field, error) {
 	// While key not equal to values: or random:, store key with value of next key
 
-	var fields []models.Field
+	var fields []Field
 
 	for key, value := range body {
 
@@ -44,7 +58,7 @@ func FlattenYamlBody(body map[string]any, path []string) ([]models.Field, error)
 			if !ok {
 				return nil, fmt.Errorf("values at %v must be an array", path)
 			}
-			fields = append(fields, models.Field{
+			fields = append(fields, Field{
 				Path:   path,
 				Mode:   "values",
 				Values: values,
@@ -54,7 +68,7 @@ func FlattenYamlBody(body map[string]any, path []string) ([]models.Field, error)
 			if !ok {
 				return nil, fmt.Errorf("List at %v must be an array", path)
 			}
-			fields = append(fields, models.Field{
+			fields = append(fields, Field{
 				Path:   path,
 				Mode:   "list",
 				Values: values,
@@ -68,11 +82,11 @@ func FlattenYamlBody(body map[string]any, path []string) ([]models.Field, error)
 			min := random["min"]
 			max := random["max"]
 
-			min_float, err := utils.ToFloat64(min)
+			min_float, err := toFloat64(min)
 			if err != nil {
 				return nil, err
 			}
-			max_float, err := utils.ToFloat64(max)
+			max_float, err := toFloat64(max)
 			if err != nil {
 				return nil, err
 			}
@@ -90,7 +104,7 @@ func FlattenYamlBody(body map[string]any, path []string) ([]models.Field, error)
 				parser.RandomOp{Operator: parser.MIN_OP, Val: min_float},
 			)
 
-			fields = append(fields, models.Field{
+			fields = append(fields, Field{
 				Path:   path,
 				Mode:   "random",
 				Values: ops,
@@ -112,4 +126,19 @@ func FlattenYamlBody(body map[string]any, path []string) ([]models.Field, error)
 	}
 
 	return fields, nil
+}
+
+func toFloat64(value any) (float64, error) {
+	switch v := value.(type) {
+	case int:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case uint64:
+		return float64(v), nil
+	case float64:
+		return v, nil
+	default:
+		return 0, fmt.Errorf("expected number, got %T", value)
+	}
 }

@@ -7,7 +7,8 @@ import (
 	"main/printout"
 	"main/reader"
 	"main/requestHandler"
-	"main/utils"
+	"strings"
+	"time"
 )
 
 func RunTests(runConfig models.RunConfig, file string) (string, error) {
@@ -18,10 +19,10 @@ func RunTests(runConfig models.RunConfig, file string) (string, error) {
 	}
 
 	config, err := reader.ReadYamlFile(file)
-	utils.CheckError(err, "failed to read yaml file")
+	log.Fatal(err)
 
 	flattenedBody, err := reader.FlattenYamlBody(config.Body, []string{})
-	utils.CheckError(err, "Failed to parse and flatten yaml body")
+	log.Fatal(err)
 
 	requests := requestHandler.ParseAndGenerateRequests(flattenedBody)
 
@@ -47,5 +48,14 @@ func determineOutputFile(config models.YamlConfig, runConfig models.RunConfig) s
 		return runConfig.Output
 	}
 
-	return utils.CleanString(config.Name) + utils.GetTimeStamp() + ".csv"
+	return cleanString(config.Name) + getTimeStamp() + ".csv"
+}
+
+func cleanString(input string) string {
+	return strings.ToLower(strings.ReplaceAll(input, " ", "_"))
+}
+
+func getTimeStamp() string {
+	currentTime := time.Now()
+	return currentTime.Format("2006-01-02_15-04-05")
 }
