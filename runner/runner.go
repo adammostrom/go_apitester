@@ -29,7 +29,7 @@ func RunTests(runConfig config.RunConfig, file string) error {
 		return fmt.Errorf("Failed to parse yaml body section: %s. error: %w ", config.Body, err)
 	}
 
-	requests := parser.ParseAndGenerateRequests(flattenedBody)
+	requests := parser.GenerateRequests(flattenedBody, runConfig)
 
 	for _, req := range requests {
 		reporter.VPrintf("generated requests: %v\n", req)

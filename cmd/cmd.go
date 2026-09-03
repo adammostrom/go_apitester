@@ -111,16 +111,16 @@ func init() {
 		&requests,
 		"requests",
 		"n",
-		1,
+		0,
 		"Number of requests",
 	)
 
 	runCmd.Flags().IntVarP(
 		&repeat,
-		"repeats",
+		"repeating",
 		"r",
 		0,
-		"number of repeats for the specified requests",
+		"number of repeats for the requests",
 	)
 }
 

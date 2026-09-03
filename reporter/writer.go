@@ -71,7 +71,7 @@ func WriteToCsv(testName string, testMethod string, testExpectedMethod int, resp
 			response.Resp.Request.URL.Path,
 			response.Result,
 			response.Resp.Status,
-			strconv.Itoa(response.Resp.StatusCode),
+			strconv.Itoa(response.Resp.StatusCode), // <--- BUG HERE WHEN RESPONSE IS NIL, SEGFAULT
 			strconv.Itoa(testExpectedMethod),
 			response.Time.String(),
 			response.Body,

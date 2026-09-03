@@ -3,9 +3,46 @@ package parser
 import (
 	"fmt"
 	"log"
+	"main/config"
 	"main/models"
 	"math/rand/v2"
 )
+
+func GenerateRequests(bodyFields []Field, runConfig config.RunConfig) []map[string]any {
+
+	amount := runConfig.Requests
+
+	if amount < 0 {
+		return nil
+	}
+
+	requests := ParseAndGenerateRequests(bodyFields)
+
+	if amount == 0 {
+		amount = len(requests)
+	}
+
+	sizeRequests := len(requests)
+
+	if sizeRequests > amount {
+		return requests[0:amount]
+	} else if sizeRequests == amount {
+		return requests
+	} else if sizeRequests < amount {
+
+		iterations := amount / sizeRequests
+
+		for iterations > 0 {
+			newRequests := ParseAndGenerateRequests(bodyFields)
+			for _, newRequest := range newRequests {
+				requests = append(requests, newRequest)
+			}
+			iterations--
+		}
+	}
+	return requests[:amount]
+
+}
 
 // Takes a slice of paths, and appends them into a recursive map
 func setPath(path []string, val any, target map[string]any) {

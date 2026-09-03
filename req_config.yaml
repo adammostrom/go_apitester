@@ -36,3 +36,13 @@ body:
           - FAT
           - SATURATED_FAT
           - TRANS_FAT
+
+
+## TODO::
+
+# expect:
+#   status: 200
+#   body:
+#     calories:
+#       type: number
+#       min: 0
