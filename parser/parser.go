@@ -2,22 +2,30 @@ package parser
 
 import (
 	"fmt"
-	"log"
-	"main/config"
-	"main/models"
+	"main/reporter"
 	"math/rand/v2"
 )
 
-func GenerateRequests(bodyFields []Field, runConfig config.RunConfig) []map[string]any {
-
-	amount := runConfig.Requests
+/*
+TODO: Optimize
+Given a request body and an amount, returns generated requests with the length of amount.
+The generated requests are generated in a subcommand and returns the minimum length of the cartesian product of value/list values of the yaml file.
+*/
+func GenerateRequests(bodyFields []Field, amount int) ([]map[string]any, error) {
 
 	if amount < 0 {
-		return nil
+		return nil, fmt.Errorf("Amount must be GEQ 0, provided was: %d", amount)
 	}
 
-	requests := ParseAndGenerateRequests(bodyFields)
+	requests, err := ParseAndGenerateRequests(bodyFields)
+	if err != nil {
+		return nil, err
+	}
 
+	if len(requests) == 0 {
+		return []map[string]any{}, nil
+	}
+	// Default flag value is 0, so assumption is that 0 means: user never specified an amount
 	if amount == 0 {
 		amount = len(requests)
 	}
@@ -25,90 +33,67 @@ func GenerateRequests(bodyFields []Field, runConfig config.RunConfig) []map[stri
 	sizeRequests := len(requests)
 
 	if sizeRequests > amount {
-		return requests[0:amount]
+		return requests[0:amount], nil
 	} else if sizeRequests == amount {
-		return requests
+		return requests, nil
 	} else if sizeRequests < amount {
 
 		iterations := amount / sizeRequests
 
 		for iterations > 0 {
-			newRequests := ParseAndGenerateRequests(bodyFields)
+			newRequests, err := ParseAndGenerateRequests(bodyFields)
+			if err != nil {
+				return nil, err
+			}
 			for _, newRequest := range newRequests {
 				requests = append(requests, newRequest)
 			}
 			iterations--
 		}
 	}
-	return requests[:amount]
+	return requests[:amount], nil
 
-}
-
-// Takes a slice of paths, and appends them into a recursive map
-func setPath(path []string, val any, target map[string]any) {
-
-	body := target
-
-	current := body
-
-	for i, key := range path {
-		if i == len(path)-1 {
-			current[key] = val
-			break
-		}
-		next := map[string]any{}
-		current[key] = next
-
-		current = next
-
-	}
-	//return body
-}
-
-type Field struct {
-	Path   []string
-	Mode   string
-	Values []any
 }
 
 // Generate the request bodies from flattened/parsed yaml bodies.
-func ParseAndGenerateRequests(bodyFields []Field) []map[string]any {
+func ParseAndGenerateRequests(bodyFields []Field) ([]map[string]any, error) {
 
 	if bodyFields == nil {
-		fmt.Println("Empty fields list, unable to generate any requests.")
-		return nil
+		reporter.VPrintf("Empty fields list, returning empty requests: %v\n", bodyFields)
+		return []map[string]any{}, nil
 	}
 
-	prepared_requests := GenerateValueBodies(bodyFields)
+	prepared_requests, err := GenerateValueBodies(bodyFields)
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO: if the prepared_requests (permutated yaml values) are less than amount of requests, copy them randomly to fill out the list of requests. If the permutation is larger than the amount of requests, cut off the list, and save it presentable to the user like "requests NOT sent, to send a fully covered permutation, increase amount of requests to: "
-	// Should be determined by the user input (amount of requests)
 	amount_requests := len(prepared_requests)
 
 	for _, field := range bodyFields {
 
 		switch field.Mode {
 
-		case string(models.ModeValues):
+		case string(ModeValues):
 			continue
 
 		// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
-		case string(models.ModeRandom):
+		case string(ModeRandom):
 
 			randoms, err := GenerateRandomPoints(field, amount_requests)
 			if err != nil {
 				// TODO: Make sure empty (not filled out min, max) returns in this crashing.
-				log.Fatal("Failed to generate Random Numbers from Handler")
+				return nil, fmt.Errorf("Failed to generate Random Numbers from Handler")
 			}
 
 			for i, rand := range randoms {
 				setPath(field.Path, rand, prepared_requests[i])
 			}
-		case string(models.ModeList):
+		case string(ModeList):
 			// For each request, make a subset of the list
 			lists, err := GenerateSubLists(field, amount_requests)
 			if err != nil {
-				log.Fatal("Failed to generate lists array from request handler.")
+				return nil, fmt.Errorf("Failed to generate lists array from request handler.")
 			}
 			for i, list := range lists {
 				setPath(field.Path, list, prepared_requests[i])
@@ -117,11 +102,11 @@ func ParseAndGenerateRequests(bodyFields []Field) []map[string]any {
 		}
 
 	}
-	return prepared_requests
+	return prepared_requests, nil
 }
 
 // Take all Value operators in the fields, and make a cartesian product of them
-func GenerateValueBodies(fields []Field) []map[string]any {
+func GenerateValueBodies(fields []Field) ([]map[string]any, error) {
 
 	// Initially : [{}]
 	bodies := []map[string]any{
@@ -131,10 +116,13 @@ func GenerateValueBodies(fields []Field) []map[string]any {
 	// {[product_name] values [salmon egg meatballs bread]}
 
 	// The values found in the yaml file
+	if fields == nil {
+		return nil, fmt.Errorf("Fields empty, returning empty : %v", bodies)
+	}
 
 	for _, field := range fields {
 
-		if field.Mode != string(models.ModeValues) {
+		if field.Mode != string(ModeValues) {
 			continue
 		}
 
@@ -153,7 +141,7 @@ func GenerateValueBodies(fields []Field) []map[string]any {
 		}
 		bodies = newBodies
 	}
-	return bodies
+	return bodies, nil
 }
 
 func cloneMap(src map[string]any) map[string]any {
@@ -184,7 +172,7 @@ func GenerateRandomPoints(randomField Field, multiplier int) ([]float64, error) 
 	var max float64
 
 	// Will never fail, pointless check, but anyways...
-	if randomField.Mode != string(models.ModeRandom) {
+	if randomField.Mode != string(ModeRandom) {
 		return nil, fmt.Errorf("Field mode not equal to list operator: %v", randomField.Mode)
 	}
 
@@ -231,7 +219,7 @@ func GenerateSubLists(field Field, multiplier int) ([][]any, error) {
 	size := len(field.Values)
 
 	// Will never fail, pointless check, but anyways...
-	if field.Mode != string(models.ModeList) {
+	if field.Mode != string(ModeList) {
 		return nil, fmt.Errorf("Field mode not equal to list operator: %v \n", field.Mode)
 	}
 	if size < 1 {
@@ -287,3 +275,41 @@ func Contains_float(values []float64, wanted float64) bool {
 	}
 	return false
 }
+
+// Takes a slice of paths, and appends them into a recursive map
+func setPath(path []string, val any, target map[string]any) {
+
+	body := target
+
+	current := body
+
+	for i, key := range path {
+		if i == len(path)-1 {
+			current[key] = val
+			break
+		}
+		next := map[string]any{}
+		current[key] = next
+
+		current = next
+
+	}
+	//return body
+}
+
+type Field struct {
+	Path   []string
+	Mode   string
+	Values []any
+}
+
+type Mode string
+
+// Add more eventually
+const (
+	ModeValues     Mode = "values"
+	ModeList       Mode = "list"
+	ModeRandom     Mode = "random"
+	ModeStochastic Mode = "stochastic"
+	ModeStatic     Mode = "static"
+)

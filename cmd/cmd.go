@@ -33,6 +33,7 @@ var runCmd = &cobra.Command{
 			Verbose:  verbose,
 			Output:   output,
 			Requests: requests,
+			Rate:     rate,
 		}
 		err := runner.RunTests(config, file)
 		if err != nil {
@@ -117,12 +118,29 @@ func init() {
 
 	runCmd.Flags().IntVarP(
 		&repeat,
-		"repeating",
+		"repeat",
 		"r",
 		0,
-		"number of repeats for the requests",
+		"number of repeats for the requests. The amount represents the cycles through the full request set.",
+	)
+
+	runCmd.Flags().IntVar(
+		&rate,
+		"rate",
+		0,
+		"Sets the rate for requests per second. Until cancelled.",
 	)
 }
+
+/*
+TODO:
+
+--rate N
+    Send N requests per second.
+
+--duration N
+    Continue execution for N seconds.
+*/
 
 // FLAGS
 
@@ -132,6 +150,7 @@ var (
 	output   string
 	requests int
 	repeat   int
+	rate     int
 )
 
 // Examples

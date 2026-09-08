@@ -5,9 +5,18 @@ import (
 	"main/config"
 	"main/parser"
 	"os"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
+
+var methods = [...]string{
+	"GET",
+	"POST",
+	"DELETE",
+	"UPDATE",
+	"PATCH",
+}
 
 func ReadYamlFile(path string) (config.YamlConfig, error) {
 	contents, err := os.ReadFile(path)
@@ -25,15 +34,102 @@ func ReadYamlFile(path string) (config.YamlConfig, error) {
 }
 
 /*
+Enforce things that matter to correctness, e.g.:
+
+name must exist
+name must be non-empty
+method must be a valid HTTP method
+repeat >= 0
+random.min <= random.max
+required operators have the correct structure/type
+
+Rule of thumb:
+
+If violating it could break the program or make the configuration ambiguous, validate it. Otherwise, be permissive.
+*/
+func ValidateYAML(config config.YamlConfig) error {
+
+	fmt.Printf("config: %v\n", config)
+
+	if config.Name == "" {
+		return fmt.Errorf("Name section in yaml file not provided\n")
+	}
+	if config.Method == "" {
+		return fmt.Errorf("Method section in yaml file not provided\n")
+	}
+	if config.Path == "" {
+		return fmt.Errorf("Path URL not provided\n")
+	}
+	if !validateMethod(config.Method) {
+		return fmt.Errorf("method provided is not valid: %v. Valid methods: %v\n", config.Method, methods)
+	}
+	if !validName(config.Name) {
+		return fmt.Errorf("Illegal symbol in name section of yaml file: %s", config.Name)
+	}
+	if !validateExpected(config.Expect.Expect) {
+		return fmt.Errorf("Expected status code of yaml file not accepted: %d", config.Expect.Expect)
+	}
+
+	return nil
+}
+
+func validName(name string) bool {
+	for _, letter := range name {
+		if unicode.IsSymbol(letter) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateMethod(method string) bool {
+
+	//var methods = []string{"GET", "POST", "DELETE", "PUT", "PATCH"}
+
+	for _, m := range methods {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
+func validateExpected(expected int) bool {
+
+	var statusCodes = []int{200, 404, 506}
+
+	for _, s := range statusCodes {
+		if expected == s {
+			return true
+		}
+	}
+	return false
+}
+
+func validateSchemaStruct() {
+
+	/*
+
+		Legit Schema:
+			name: nutrition-test
+			method: POST
+			path: /nutrition
+			body:
+			  product_name:
+			    values: [salmon, egg]
+	*/
+}
+
+/*
 map[amount:map[random:map[max:200 min:0]] fields:map[values:CALORIES FAT SATURATED_FAT TRANS_FAT] product_name:map[values:salmon egg meatballs bread] unit:map[values:GRAM]]
 */
 
-func FlattenYamlBody(body map[string]any, path []string) ([]parser.Field, error) {
+func FlattenYamlBody(yamlBody map[string]any, path []string) ([]parser.Field, error) {
 	// While key not equal to values: or random:, store key with value of next key
 
 	var fields []parser.Field
 
-	for key, value := range body {
+	for key, value := range yamlBody {
 
 		switch key {
 

@@ -1,10 +1,48 @@
 package parser
 
 import (
-	"main/models"
 	"reflect"
 	"testing"
 )
+
+func TestGenerateRequests(t *testing.T) {
+
+	bodyFields := []Field{
+		Field{
+			Path:   []string{"data"},
+			Mode:   "values",
+			Values: []any{"salmon", "egg"},
+		},
+	}
+
+	// amount of requests we want
+	var amount = 3
+
+	requests, err := ParseAndGenerateRequests(bodyFields)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	requests2, err := ParseAndGenerateRequests(bodyFields)
+
+	requests = append(requests, requests2...)
+
+	want := requests[:len(requests)-1]
+
+	got, err := GenerateRequests(bodyFields, amount)
+
+	if len(got) != len(want) {
+		t.Errorf("Lengths not equal:  got: %v, want: %v\n", got, want)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got: %v, and Want: %v not equal!\n", got, want)
+	}
+}
+
+func TestParseAndGenerateRequests(t *testing.T) {
+
+}
 
 // SetPath Test //
 func TestSetPath(t *testing.T) {
@@ -42,12 +80,12 @@ func TestGenerateValueBodies(t *testing.T) {
 	fields := []Field{
 		{
 			Path:   []string{"product_name"},
-			Mode:   string(models.ModeValues),
+			Mode:   string(ModeValues),
 			Values: []any{"salmon", "egg", "beans", "soymilk"},
 		},
 		{
 			Path:   []string{"unit"},
-			Mode:   string(models.ModeValues),
+			Mode:   string(ModeValues),
 			Values: []any{"GRAMS", "CUPS"},
 		},
 	}
@@ -57,7 +95,10 @@ func TestGenerateValueBodies(t *testing.T) {
 	// Invariants:
 
 	// Size of cartesian product = m x n
-	generated := GenerateValueBodies(fields)
+	generated, err := GenerateValueBodies(fields)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
 
 	lenwanted := 1
 	for _, item := range fields {
@@ -96,7 +137,7 @@ func TestGenerateRandomPoints(t *testing.T) {
 
 	field := Field{
 		Path: []string{"amount"},
-		Mode: string(models.ModeRandom),
+		Mode: string(ModeRandom),
 		Values: []any{
 			RandomOp{Operator: MAX_OP, Val: 200},
 			RandomOp{Operator: MIN_OP, Val: 0},
