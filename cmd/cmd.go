@@ -117,16 +117,9 @@ func init() {
 	)
 
 	runCmd.Flags().IntVarP(
-		&repeat,
-		"repeat",
-		"r",
-		0,
-		"number of repeats for the requests. The amount represents the cycles through the full request set.",
-	)
-
-	runCmd.Flags().IntVar(
 		&rate,
 		"rate",
+		"r",
 		0,
 		"Sets the rate for requests per second. Until cancelled.",
 	)

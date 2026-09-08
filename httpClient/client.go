@@ -16,7 +16,6 @@ import (
 // Sends a single request
 func SendRequest(configMethod string, configPath string, request map[string]any) (models.Response, error) {
 
-	fmt.Println("ARRIVED")
 	jsonBody, err := json.Marshal(request)
 	if err != nil {
 		return models.Response{}, fmt.Errorf("Failed to marshal json body: %w\n", err)
@@ -47,12 +46,11 @@ func SendRequest(configMethod string, configPath string, request map[string]any)
 	reporter.VPrintf(" - success. ms: %v\n", duration.Milliseconds())
 
 	body, err := io.ReadAll(resp.Body)
-	reporter.VPrintf("response: %v\n ", resp)
-	resp.Body.Close()
-
 	if err != nil {
 		return models.Response{}, fmt.Errorf("Failed to read response body, %w\n", err)
 	}
+	defer resp.Body.Close()
+	reporter.VPrintf("response: %s\n ", body)
 
 	response := models.Response{
 		Body: string(body),

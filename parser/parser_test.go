@@ -29,7 +29,7 @@ func TestGenerateRequests(t *testing.T) {
 
 	want := requests[:len(requests)-1]
 
-	got, err := GenerateRequests(bodyFields, amount)
+	got, err := GenerateRequestBodies(bodyFields, amount)
 
 	if len(got) != len(want) {
 		t.Errorf("Lengths not equal:  got: %v, want: %v\n", got, want)
@@ -144,7 +144,7 @@ func TestGenerateRandomPoints(t *testing.T) {
 		},
 	}
 
-	numbers, err := GenerateRandomPoints(field, 8)
+	numbers, err := GenerateRandomPoints(field)
 	if err != nil {
 		t.Errorf("Error from function")
 	}

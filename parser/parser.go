@@ -11,7 +11,7 @@ TODO: Optimize
 Given a request body and an amount, returns generated requests with the length of amount.
 The generated requests are generated in a subcommand and returns the minimum length of the cartesian product of value/list values of the yaml file.
 */
-func GenerateRequests(bodyFields []Field, amount int) ([]map[string]any, error) {
+func GenerateRequestBodies(bodyFields []Field, amount int) ([]map[string]any, error) {
 
 	if amount < 0 {
 		return nil, fmt.Errorf("Amount must be GEQ 0, provided was: %d", amount)
@@ -63,59 +63,48 @@ func ParseAndGenerateRequests(bodyFields []Field) ([]map[string]any, error) {
 		return []map[string]any{}, nil
 	}
 
-	prepared_requests, err := GenerateValueBodies(bodyFields)
+	bodies, err := GenerateValueBodies(bodyFields)
 	if err != nil {
 		return nil, err
 	}
 
-	amount_requests := len(prepared_requests)
+	for _, body := range bodies {
+		for _, field := range bodyFields {
 
-	for _, field := range bodyFields {
+			switch field.Mode {
 
-		switch field.Mode {
+			case string(ModeValues):
+				continue
 
-		case string(ModeValues):
-			continue
+			case string(ModeRandom):
 
-		// Generate random numbers, including mininum and maximum, preferably one random per permutated value, can be increased.
-		case string(ModeRandom):
+				rand, err := GenerateRandomPoints(field)
+				if err != nil {
+					return nil, fmt.Errorf("Failed to generate Random Numbers from Handler")
+				}
+				setPath(field.Path, rand, body)
 
-			randoms, err := GenerateRandomPoints(field, amount_requests)
-			if err != nil {
-				// TODO: Make sure empty (not filled out min, max) returns in this crashing.
-				return nil, fmt.Errorf("Failed to generate Random Numbers from Handler")
+			case string(ModeSubset):
+
+				setPath(field.Path, randomSubset(field.Values), body)
+
+			case string(ModeList):
+				setPath(field.Path, field.Values, body)
+
 			}
-
-			for i, rand := range randoms {
-				setPath(field.Path, rand, prepared_requests[i])
-			}
-		case string(ModeList):
-			// For each request, make a subset of the list
-			lists, err := GenerateSubLists(field, amount_requests)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to generate lists array from request handler.")
-			}
-			for i, list := range lists {
-				setPath(field.Path, list, prepared_requests[i])
-			}
-
 		}
-
+		reporter.VPrintf("prepared request body: %v\n", body)
 	}
-	return prepared_requests, nil
+	return bodies, nil
 }
 
 // Take all Value operators in the fields, and make a cartesian product of them
 func GenerateValueBodies(fields []Field) ([]map[string]any, error) {
 
-	// Initially : [{}]
 	bodies := []map[string]any{
 		{},
 	}
 
-	// {[product_name] values [salmon egg meatballs bread]}
-
-	// The values found in the yaml file
 	if fields == nil {
 		return nil, fmt.Errorf("Fields empty, returning empty : %v", bodies)
 	}
@@ -144,15 +133,6 @@ func GenerateValueBodies(fields []Field) ([]map[string]any, error) {
 	return bodies, nil
 }
 
-func cloneMap(src map[string]any) map[string]any {
-
-	dst := make(map[string]any)
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
 type RandomOp struct {
 	Operator int
 	Val      float64
@@ -163,27 +143,26 @@ const (
 	MIN_OP
 )
 
-// TODO: Currently only supporting integers.
-func GenerateRandomPoints(randomField Field, multiplier int) ([]float64, error) {
-
-	points := []float64{}
+// Refactor: Instead of making it return a list of random values, just have it generate one value each time?
+func GenerateRandomPoints(randomField Field) (float64, error) {
 
 	var min float64
 	var max float64
 
 	// Will never fail, pointless check, but anyways...
 	if randomField.Mode != string(ModeRandom) {
-		return nil, fmt.Errorf("Field mode not equal to list operator: %v", randomField.Mode)
+		return 0, fmt.Errorf("Field mode not equal to list operator: %v", randomField.Mode)
 	}
 
 	if len(randomField.Values) < 1 {
-		return nil, fmt.Errorf("Values empty, expected atleast a min and a max operator.")
+		return 0, fmt.Errorf("Values empty, expected atleast a min and a max operator.")
 	}
+
 	// Should only be two items, min and max.
 	for _, v := range randomField.Values {
 
 		if value, ok := v.(RandomOp); !ok {
-			return nil, fmt.Errorf("Expected randomOp from Values list of %v\n", v)
+			return 0, fmt.Errorf("Expected randomOp from Values list of %v\n", v)
 		} else {
 			switch value.Operator {
 			case MAX_OP:
@@ -193,23 +172,11 @@ func GenerateRandomPoints(randomField Field, multiplier int) ([]float64, error) 
 			}
 		}
 	}
-
-	// TODO: Should always include the min and max, for edge case testing
-	points = append(points, min)
-	points = append(points, max)
-
-	for i := 0; i < multiplier-2; i++ {
-
-		random := randomFloat(min, max)
-
-		if !Contains_float(points, random) {
-			points = append(points, random)
-		} else {
-			// Iterate an extra time
-			i--
-		}
+	if min > max {
+		return 0, fmt.Errorf("Min cannot be larger than max: min:%d max%d\n", min, max)
 	}
-	return points, nil
+
+	return randomFloat(min, max), nil
 }
 
 func GenerateSubLists(field Field, multiplier int) ([][]any, error) {
@@ -219,7 +186,7 @@ func GenerateSubLists(field Field, multiplier int) ([][]any, error) {
 	size := len(field.Values)
 
 	// Will never fail, pointless check, but anyways...
-	if field.Mode != string(ModeList) {
+	if field.Mode != string(ModeSubset) {
 		return nil, fmt.Errorf("Field mode not equal to list operator: %v \n", field.Mode)
 	}
 	if size < 1 {
@@ -229,12 +196,7 @@ func GenerateSubLists(field Field, multiplier int) ([][]any, error) {
 	}
 
 	for i := 0; i < multiplier; i++ {
-		/* 		list := []any{}
 
-		   		upper_bound := randomInt(1, size)
-
-		   		list = append(list, field.Values[:upper_bound]...)
-		   		subLists = append(subLists, list) */
 		subLists = append(subLists, randomSubset(field.Values))
 	}
 
@@ -276,25 +238,38 @@ func Contains_float(values []float64, wanted float64) bool {
 	return false
 }
 
+func cloneMap(src map[string]any) map[string]any {
+
+	dst := make(map[string]any)
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
 // Takes a slice of paths, and appends them into a recursive map
 func setPath(path []string, val any, target map[string]any) {
 
-	body := target
-
-	current := body
+	current := target
 
 	for i, key := range path {
+
 		if i == len(path)-1 {
 			current[key] = val
-			break
+			return
 		}
-		next := map[string]any{}
-		current[key] = next
+
+		// Does this key already contain a map?
+		next, ok := current[key].(map[string]any)
+
+		if !ok {
+			next = make(map[string]any)
+			current[key] = next
+		}
 
 		current = next
 
 	}
-	//return body
 }
 
 type Field struct {
@@ -310,6 +285,7 @@ const (
 	ModeValues     Mode = "values"
 	ModeList       Mode = "list"
 	ModeRandom     Mode = "random"
+	ModeSubset     Mode = "subset"
 	ModeStochastic Mode = "stochastic"
 	ModeStatic     Mode = "static"
 )

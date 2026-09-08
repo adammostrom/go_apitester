@@ -21,35 +21,33 @@ func PrintResults(config config.YamlConfig, responses []models.Response) {
 
 		if response.Error != nil {
 			fmt.Printf(
-				"[FAIL] %s > %s - %s - ERROR: %v\n",
+				"[FAIL] %s > %s - %s time=%d - ERROR: %v",
 				GetTimeStamp(),
 				config.Name,
 				response.Result,
+				response.Time.Milliseconds(),
 				response.Error,
 			)
 
-			VPrintf(
-				"%v",
-				response.Time.Milliseconds(),
-			)
+			//VPrintf()
 
 			continue
 		}
 
 		fmt.Printf(
-			"[INFO] %s > %s - %s - %d - %d\n",
+			"[INFO] %s > %s - %s - %d - %d time=%d\n",
 			GetTimeStamp(),
 			config.Name,
 			response.Result,
 			response.Resp.StatusCode,
 			config.Expect.Expect,
-		)
-
-		VPrintf(
-			"%v, %v",
-			response.Resp.Body,
 			response.Time.Milliseconds(),
 		)
+
+		/* 		VPrintf(
+			"%v",
+			response.Resp.Body,
+		) */
 	}
 }
 

@@ -32,80 +32,70 @@ func RunTests(runConfig config.RunConfig, file string) error {
 		return err
 	}
 
-	// Check file actually a yaml file
 	if runConfig.Verbose {
 		reporter.Verbose = true
 	}
 
-	config, err := reader.ReadYamlFile(file)
+	yamlConfig, err := reader.ReadYamlFile(file)
 	if err != nil {
 		return fmt.Errorf("Failed to read Yaml file: %s. error: %w", file, err)
 	}
 
-	if err = reader.ValidateYAML(config); err != nil {
+	// TODO: Combine with readYamlFile and just return the valid yaml configuration
+	if err = reader.ValidateYAML(yamlConfig); err != nil {
 		return err
 	}
 
-	flattenedBody, err := reader.FlattenYamlBody(config.Body, []string{})
+	flattenedBody, err := reader.FlattenYamlBody(yamlConfig.Body, []string{})
 	if err != nil {
-		return fmt.Errorf("Failed to parse yaml body section: %s. error: %w ", config.Body, err)
+		return fmt.Errorf("Failed to parse yaml body section: %s. error: %w ", yamlConfig.Body, err)
 	}
 
-	requests, err := parser.GenerateRequests(flattenedBody, runConfig.Requests)
+	requestBodies, err := parser.GenerateRequestBodies(flattenedBody, runConfig.Requests)
 	if err != nil {
 		return err
 	}
 
-	for i, req := range requests {
-		reporter.VPrintf("generated request bodies: %d/%d, %v\n", i+1, len(requests), req)
+	for i, req := range requestBodies {
+		reporter.VPrintf("generated request body: %d/%d, %v\n", i+1, len(requestBodies), req)
 	}
 	// Here, generate setup for requests, like creating a request for each value in the values if its a "value" operator. Maybe generate a bunch of requests to send, store them in a slice, inform user of amount of requests, and if user wnats to see, prints them before sending them?
 
 	responses := []models.Response{}
 
-	cycles := runConfig.Repeat
-
-	for runConfig.Repeat > -1 {
-
-		reporter.VPrintf("Cycle: %d/%d\n", runConfig.Repeat, cycles)
-
-		fmt.Printf("requests: %v\n", requests)
-
-		resp, err := sendRequests(config, requests, amount)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("POST SEND REQ")
-
-		responses = append(responses, resp...)
-
-		runConfig.Repeat--
+	responses, err = sendRequests(yamlConfig, requestBodies, runConfig.Requests)
+	if err != nil {
+		return err
 	}
 
-	outputFile := determineOutputFile(config.Name, runConfig)
+	outputFile := determineOutputFile(yamlConfig.Name, runConfig)
 	if runConfig.Output != "" {
-		reporter.WriteToCsv(config, responses, outputFile)
+		reporter.WriteToCsv(yamlConfig, responses, outputFile)
 		return nil
 	}
 
-	reporter.PrintResults(config, responses)
+	reporter.PrintResults(yamlConfig, responses)
 	return nil
 
 }
 
-func sendRequests(config config.YamlConfig, requests []map[string]any, amount int) ([]models.Response, error) {
+func sendRequests(yamlConfig config.YamlConfig, requestBodies []map[string]any, amount int) ([]models.Response, error) {
 
 	responses := []models.Response{}
 
-	for _, request := range requests {
+	for i := 0; i < amount; i++ {
+		request := map[string]any{}
 
-		response, err := httpClient.SendRequest(config.Method, config.Path, request)
+		if len(requestBodies) != 0 {
+			request = requestBodies[i]
+		}
+
+		response, err := httpClient.SendRequest(yamlConfig.Method, yamlConfig.Path, request)
 		if err != nil {
 			responses = append(responses, models.Response{Result: "FAIL", Error: err})
 			continue
 		}
-		if response.Resp.StatusCode == config.Expect.Expect {
+		if response.Resp.StatusCode == yamlConfig.Expect.Expect {
 			response.Result = "OK"
 		} else {
 			response.Result = "FAIL"

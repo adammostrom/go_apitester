@@ -49,8 +49,6 @@ If violating it could break the program or make the configuration ambiguous, val
 */
 func ValidateYAML(config config.YamlConfig) error {
 
-	fmt.Printf("config: %v\n", config)
-
 	if config.Name == "" {
 		return fmt.Errorf("Name section in yaml file not provided\n")
 	}
@@ -83,8 +81,6 @@ func validName(name string) bool {
 }
 
 func validateMethod(method string) bool {
-
-	//var methods = []string{"GET", "POST", "DELETE", "PUT", "PATCH"}
 
 	for _, m := range methods {
 		if m == method {
@@ -144,7 +140,7 @@ func FlattenYamlBody(yamlBody map[string]any, path []string) ([]parser.Field, er
 				Mode:   "values",
 				Values: values,
 			})
-		case "list":
+		case "subsets":
 			values, ok := value.([]any)
 			if !ok {
 				return nil, fmt.Errorf("List at %v must be an array", path)
